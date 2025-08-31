@@ -71,7 +71,8 @@ python agronomiq.py
 
 ## Notes
 
-* Foi feito em arquivo .py por ser mais robusto e pronto para automações e processos.
+* Foi feito em arquivo .py por ser mais robusto e pronto para automações e processos, entretanto, também foi adicionado os códigos ipynb em "./tasks".
 * GeoJSONs não foram salvos em UTM, pois isso pode gerar problemas de compatibilidade.
 * Task 03 depende dos dados consolidados na Task 02.
 * As análises e visualizações foram pensadas para gestores públicos, não sendo necessário conhecimento técnico avançado.
+
