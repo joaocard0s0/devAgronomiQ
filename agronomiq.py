@@ -87,12 +87,17 @@ def task_02():
     """
 
     def a()->pd.DataFrame:
-        # Pegado na internet as informações como pedido
-        path = os.path.join(THIS_PATH, "dados","populacao-pib-municipios-mg.csv")
-        print(f"Caminho do csv: {path}") 
-
+        # Path input
+        path_input = os.path.join(THIS_PATH, "dados", "task_02", "ibge_mg.xlsx")
         # Reading file
-        dataframe = pd.read_csv(path)
+        dataframe = pd.read_excel(path_input)
+        #Filter columns
+        dataframe = dataframe[["Município [-]", "PIB per capita - R$ [2021]", "População no último censo - pessoas [2022]"]]
+        # Path to save
+        path_output = os.path.join(THIS_PATH, "dados","populacao-pib-municipios-mg.csv")
+        dataframe.to_csv(path_output)
+        print(f"Caminho do csv: {path_output}") 
+
         return dataframe
 
     def b()->gpd.GeoDataFrame:
@@ -136,7 +141,7 @@ def task_02():
         print(f"Task 02, b) done, file path: {file_path}")
         return master_dataset
 
-    def c(gframe:gpd.GeoDataFrame)->pd.DataFrame:
+    def c(gframe:gpd.GeoDataFrame):
         # Convert to km² and remove geometry
         gframe["area_km2"] = gframe.area / 1e6
         gframe = gframe.drop(columns="geometry")
@@ -163,35 +168,64 @@ def task_02():
         print("\nTotal deforested area by municipality (in km²):")
         print(dataframe_municipality)
 
-        return gframe
+    def d(dataframe_pib_population:pd.DataFrame, gframe_deforestation:gpd.GeoDataFrame):
+        # Find deforestation by municipality
+        path_full_municipality = os.path.join(THIS_PATH, "dados", "municipios-mg.geojson")
+        # Read file
+        municipality = gpd.read_file(path_full_municipality)
+        # Convert to utm
+        municipality = municipality.to_crs(gframe_deforestation.crs)
+        # Explode file
+        municipality = municipality.reset_index(drop=True).explode(ignore_index=True)
 
-    def d(dataframe_pib_population:pd.DataFrame, dataframe_area:pd.DataFrame):
-        # Tranform to hectare
-        dataframe_area['area_ha'] = dataframe_area['area_km2'] * 100
-        # Get área
-        area_hectare = dataframe_area['area_ha'].sum()
-        # Get population
-        population = dataframe_pib_population["População"].sum()
-        # Get population
-        pib = dataframe_pib_population["PIB"].sum()
+        # Create geodataframe with informations necessary
+        date_by_city = gpd.GeoDataFrame(geometry=[], crs=municipality.crs)
+        date_by_city.geometry = municipality.geometry
+        date_by_city["municipio"] = municipality["name"]
+        date_by_city["desmatamento_hectare"] = 0
+        date_by_city["populacao"] = 0
+        date_by_city["pib"] = 0
+        
+        # Drop var
+        del municipality
 
-        # Creating dataframe
-        dataframe = {"População": population, "PIB": pib, "area_ha": area_hectare}
-        dataframe = pd.DataFrame([dataframe])
+        for i, city_area in date_by_city.iterrows():
+            deforestation = gframe_deforestation[gframe_deforestation.intersects(city_area.geometry)]
+            if deforestation.empty: continue
+            # Add area deforestation into date_by_city
+            date_by_city.at[i, "desmatamento_hectare"] = sum(deforestation.area / 1e4)
+            # Find match with dataframe_pib_population
+            match_city = dataframe_pib_population[dataframe_pib_population["Município [-]"] == city_area.municipio]
+            if match_city.empty: continue
+            date_by_city.at[i, "populacao"] = int(match_city["População no último censo - pessoas [2022]"].iloc[0])
+            date_by_city.at[i, "pib"] = int(match_city["PIB per capita - R$ [2021]"].iloc[0])
+        
+        # Drop nan values
+        date_by_city = date_by_city[(date_by_city != 0).all(axis=1)]
         # Get corr
-        corr_matrix = dataframe[["População", "PIB", "area_ha"]].corr(method="pearson")
+        corr_matrix = date_by_city[["populacao", "pib", "desmatamento_hectare"]].corr(method="pearson")
+
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
+
+        # Save pdf
+        path_save = os.path.join(THIS_PATH, "dados", "task_02", "correlation_matrix.pdf")
+        plt.title("Matriz de Correlação")
+        plt.savefig(path_save, format='pdf')
+
+        print(f"PDF de correlação salvo em: {path_save}")
 
     # A fom task 2
     dataframe_pib_population = a()
 
     # B fom task 2
-    gframe = b()
+    gframe_deforestation = b()
 
     # C fom task 2
-    dataframe_area = c(gframe)
+    c(gframe_deforestation)
 
     # D fom task 2
-    d(dataframe_pib_population, dataframe_area)
+    d(dataframe_pib_population, gframe_deforestation)
 
 def task_03():
     """
@@ -206,7 +240,7 @@ def task_03():
 
 
     Observações:
-    - Como dependia dos dados unificados, salvei um csv  na task anterior para conseguir
+    - Como dependia dos dados unificados, salvei um csv na task anterior para conseguir
     ler sem precisar roda-la novamente
     - Salvei os dados em PDF e html, pois assim o gestor não precisará mostrar os códigos e sim documentos.
     """
@@ -297,9 +331,9 @@ def task_03():
 
 if __name__ == '__main__':
     #Tasks
-    # task_01()
+    task_01()
     task_02()
-    # task_03()
+    task_03()
 
 
     
