@@ -15,7 +15,6 @@ from pathlib import Path
 import geopandas as gpd
 import seaborn as sns
 import pandas as pd
-import requests
 import os
 
 #*********** Path File ***********
